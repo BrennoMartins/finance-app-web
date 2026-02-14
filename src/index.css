@@ -65,9 +65,13 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
+  min-height: 100vh;
+  width: 100%;
+}
+
+#root {
+  width: 100%;
   min-height: 100vh;
 }
 
@@ -183,6 +187,9 @@ button:focus-visible {
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+  html {
+    scrollbar-gutter: stable;
   }
   body {
     @apply bg-background text-foreground;
