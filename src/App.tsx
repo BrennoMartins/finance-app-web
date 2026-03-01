@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import Navbar from "./Navbar";
 import AssetList from "./AssetList";
 import Wallet from "./Wallet";
+import Contributions from "./Contributions";
 
 const NAVBAR_HEIGHT = 64; // px (h-16)
 
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/" element={<></>} />
           <Route path="/wallet" element={<Wallet />} />
           <Route path="/recommendations" element={<AssetList />} />
+          <Route path="/contributions" element={<Contributions />} />
           <Route path="/about" element={<></>} />
         </Routes>
       </main>
