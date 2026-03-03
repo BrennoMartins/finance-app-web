@@ -23,6 +23,7 @@ export default function App() {
           <Route path="/wallet" element={<Wallet />} />
           <Route path="/recommendations" element={<AssetList />} />
           <Route path="/contributions" element={<Contributions />} />
+          <Route path="/quotation" element={<p>ola quotation</p>} />
           <Route path="/about" element={<></>} />
         </Routes>
       </main>

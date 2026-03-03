@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Wallet as WalletIcon, Loader2, Plus } from "lucide-react";
+import { Wallet as WalletIcon, Loader2, Plus, Edit2, Trash2 } from "lucide-react";
 
 /** Resposta da API GET /asset */
 interface AssetFromApi {
@@ -32,13 +32,26 @@ interface AssetFromApi {
   difference: number;
   index: number;
   value: number;
-  assetCategory: {
+  bank?: {
     id: number;
-    category: string;
+    bank: string;
+  };
+  assetType?: {
+    id: number;
+    name: string;
+  };
+  subType?: {
+    id: number;
+    name: string;
+    assetType?: {
+      id: number;
+      name: string;
+    };
   };
 }
 
 export interface WalletAsset {
+  id: number;
   ativo: string;
   banco: string;
   tipo: string;
@@ -56,6 +69,8 @@ export interface WalletAsset {
   vencimento: string;
   percent: number;
 }
+
+type SortDirection = "asc" | "desc";
 
 const COLUMNS: { key: keyof WalletAsset; label: string }[] = [
   { key: "ativo", label: "Ativo" },
@@ -81,7 +96,6 @@ const API_URL = "/api/asset";
 const API_BANKS_URL = "/api/asset/bank";
 const API_ASSET_TYPES_URL = "/api/asset/asset-type";
 const API_ASSET_SUB_TYPES_URL = "/api/asset/asset-sub-type/by-asset-type";
-const API_ASSET_CATEGORIES_URL = "/api/asset/asset-category";
 
 interface BankFromApi {
   id: number;
@@ -93,16 +107,17 @@ interface AssetTypeFromApi {
   name: string;
 }
 
-interface AssetSubTypeFromApi {
+interface SubTypeFromApi {
   id: number;
   name: string;
-  assetType: { id: number; name: string };
+  assetType?: {
+    id: number;
+    name: string;
+  };
 }
 
-interface AssetCategoryFromApi {
-  id: number;
-  category: string;
-}
+
+
 
 /** Estado do formulário de cadastro (apenas campos necessários para o POST) */
 interface CadastroForm {
@@ -110,10 +125,9 @@ interface CadastroForm {
   quantity: number;
   averagePrice: number;
   quotation: number;
-  assetCategoryId: number | null;
   bankId: number | null;
   assetTypeId: number | null;
-  assetSubTypeId: number | null;
+  subTypeId: number | null;
 }
 
 const initialCadastroForm: CadastroForm = {
@@ -121,10 +135,9 @@ const initialCadastroForm: CadastroForm = {
   quantity: 0,
   averagePrice: 0,
   quotation: 0,
-  assetCategoryId: null,
   bankId: null,
   assetTypeId: null,
-  assetSubTypeId: null,
+  subTypeId: null,
 };
 
 const SELECT_CLASS = cn(
@@ -135,10 +148,11 @@ const SELECT_CLASS = cn(
 function mapApiToWalletAsset(item: AssetFromApi): WalletAsset {
   const lucroRs = item.value - item.quantity * item.averagePrice;
   return {
+    id: item.id,
     ativo: item.asset,
-    banco: "",
-    tipo: item.assetCategory?.category ?? "",
-    subTipo: "",
+    banco: item.bank?.bank ?? "",
+    tipo: item.subType?.assetType?.name ?? item.assetType?.name ?? "",
+    subTipo: item.subType?.name ?? "",
     quantidade: item.quantity,
     precoMedio: item.averagePrice,
     cotacao: item.quotation,
@@ -183,19 +197,61 @@ export default function Wallet() {
   const [assets, setAssets] = useState<WalletAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<keyof WalletAsset | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingAssetId, setEditingAssetId] = useState<number | null>(null);
   const [form, setForm] = useState<CadastroForm>(initialCadastroForm);
   const [banks, setBanks] = useState<BankFromApi[]>([]);
   const [assetTypes, setAssetTypes] = useState<AssetTypeFromApi[]>([]);
-  const [assetSubTypes, setAssetSubTypes] = useState<AssetSubTypeFromApi[]>([]);
-  const [assetCategories, setAssetCategories] = useState<AssetCategoryFromApi[]>([]);
+  const [subTypes, setSubTypes] = useState<SubTypeFromApi[]>([]);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const mapAssetsResponse = (res: { status: number; data: AssetFromApi[] | null | undefined }) => {
+    if (res.status === 204 || !Array.isArray(res.data)) {
+      return [];
+    }
+    return res.data.map(mapApiToWalletAsset);
+  };
+
+  const sortedAssets = useMemo(() => {
+    if (sortBy == null) return assets;
+
+    const sorted = [...assets].sort((a, b) => {
+      const aValue = a[sortBy];
+      const bValue = b[sortBy];
+
+      if (typeof aValue === "number" && typeof bValue === "number") {
+        return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
+      }
+
+      const aString = String(aValue ?? "");
+      const bString = String(bValue ?? "");
+      const comparison = aString.localeCompare(bString, "pt-BR", { sensitivity: "base" });
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+    return sorted;
+  }, [assets, sortBy, sortDirection]);
+
+  const handleSort = (key: keyof WalletAsset) => {
+    if (sortBy === key) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setSortBy(key);
+    setSortDirection("asc");
+  };
 
   const refetchAssets = () => {
     axios
       .get<AssetFromApi[]>(API_URL)
-      .then((res) => setAssets(res.data.map(mapApiToWalletAsset)))
+      .then((res) => {
+        setAssets(mapAssetsResponse(res));
+        setError(null);
+      })
       .catch((err) => {
         console.error("Erro ao buscar carteira:", err);
         setError("Erro ao buscar ativos da carteira.");
@@ -207,13 +263,64 @@ export default function Wallet() {
   };
 
   const handleOpenCadastro = () => {
+    setEditingAssetId(null);
     setForm(initialCadastroForm);
     setSubmitError(null);
     setDialogOpen(true);
   };
 
+  const handleOpenEditar = (asset: WalletAsset) => {
+    setEditingAssetId(asset.id);
+    // Buscar dados completos do ativo para edição
+    const assetData = assets.find((a) => a.id === asset.id);
+    if (assetData) {
+      // Buscar detalhes completos da API
+      axios
+        .get<AssetFromApi>(`${API_URL}/${asset.id}`)
+        .then((res) => {
+          const data = res.data;
+          setForm({
+            asset: data.asset,
+            quantity: data.quantity,
+            averagePrice: data.averagePrice,
+            quotation: data.quotation,
+            bankId: data.bank?.id ?? null,
+            assetTypeId: data.subType?.assetType?.id ?? data.assetType?.id ?? null,
+            subTypeId: data.subType?.id ?? null,
+          });
+          setSubmitError(null);
+          setDialogOpen(true);
+        })
+        .catch((err) => {
+          console.error("Erro ao buscar detalhes do ativo:", err);
+          setSubmitError("Erro ao carregar dados do ativo para edição.");
+        });
+    }
+  };
+
+  const handleDeleteAsset = (asset: WalletAsset) => {
+    if (
+      window.confirm(
+        `Tem certeza que deseja excluir o ativo "${asset.ativo}"? Esta ação não pode ser desfeita.`
+      )
+    ) {
+      axios
+        .delete(`${API_URL}/${asset.id}`)
+        .then(() => {
+          refetchAssets();
+        })
+        .catch((err) => {
+          console.error("Erro ao excluir ativo:", err);
+          alert(
+            err.response?.data?.message ?? "Erro ao excluir ativo. Tente novamente."
+          );
+        });
+    }
+  };
+
   const handleCloseCadastro = () => {
     setDialogOpen(false);
+    setEditingAssetId(null);
     setForm(initialCadastroForm);
     setSubmitError(null);
   };
@@ -221,35 +328,39 @@ export default function Wallet() {
   const handleSubmitCadastro = (e: React.FormEvent) => {
     e.preventDefault();
     if (
-      form.assetCategoryId == null ||
       form.bankId == null ||
       form.assetTypeId == null ||
-      form.assetSubTypeId == null
+      form.subTypeId == null
     ) {
-      setSubmitError("Preencha Categoria, Banco, Tipo e SubTipo.");
+      setSubmitError("Preencha Banco, Tipo e SubTipo.");
       return;
     }
     setSubmitLoading(true);
     setSubmitError(null);
-    axios
-      .post(API_URL, {
-        asset: form.asset,
-        quantity: form.quantity,
-        averagePrice: form.averagePrice,
-        quotation: form.quotation,
-        assetCategory: { id: form.assetCategoryId },
-        bank: { id: form.bankId },
-        assetType: { id: form.assetTypeId },
-        assetSubType: { id: form.assetSubTypeId },
-      })
+
+    const payload = {
+      asset: form.asset,
+      quantity: form.quantity,
+      averagePrice: form.averagePrice,
+      quotation: form.quotation,
+      bank: { id: form.bankId },
+      subType: { id: form.subTypeId },
+    };
+
+    const request = editingAssetId
+      ? axios.put(`${API_URL}/${editingAssetId}`, payload)
+      : axios.post(API_URL, payload);
+
+    request
       .then(() => {
         refetchAssets();
         handleCloseCadastro();
       })
       .catch((err) => {
-        console.error("Erro ao cadastrar ativo:", err);
+        console.error("Erro na operação:", err);
         setSubmitError(
-          err.response?.data?.message ?? "Erro ao cadastrar ativo. Tente novamente."
+          err.response?.data?.message ?? 
+          `Erro ao ${editingAssetId ? "editar" : "cadastrar"} ativo. Tente novamente.`
         );
       })
       .finally(() => setSubmitLoading(false));
@@ -258,7 +369,10 @@ export default function Wallet() {
   useEffect(() => {
     axios
       .get<AssetFromApi[]>(API_URL)
-      .then((res) => setAssets(res.data.map(mapApiToWalletAsset)))
+      .then((res) => {
+        setAssets(mapAssetsResponse(res));
+        setError(null);
+      })
       .catch((err) => {
         console.error("Erro ao buscar carteira:", err);
         setError(
@@ -281,29 +395,24 @@ export default function Wallet() {
       .get<AssetTypeFromApi[]>(API_ASSET_TYPES_URL)
       .then((res) => setAssetTypes(res.data))
       .catch((err) => {
-        console.error("Erro ao buscar tipos de ativo:", err);
+        console.error("Erro ao buscar tipos:", err);
         setAssetTypes([]);
       });
-    axios
-      .get<AssetCategoryFromApi[]>(API_ASSET_CATEGORIES_URL)
-      .then((res) => setAssetCategories(res.data))
-      .catch((err) => {
-        console.error("Erro ao buscar categorias:", err);
-        setAssetCategories([]);
-      });
+    setSubTypes([]);
   }, [dialogOpen]);
 
   useEffect(() => {
+    // load subtypes whenever type changes while dialog open
     if (!dialogOpen || form.assetTypeId == null) {
-      setAssetSubTypes([]);
+      setSubTypes([]);
       return;
     }
     axios
-      .get<AssetSubTypeFromApi[]>(`${API_ASSET_SUB_TYPES_URL}/${form.assetTypeId}`)
-      .then((res) => setAssetSubTypes(res.data))
+      .get<SubTypeFromApi[]>(`${API_ASSET_SUB_TYPES_URL}/${form.assetTypeId}`)
+      .then((res) => setSubTypes(res.data))
       .catch((err) => {
         console.error("Erro ao buscar subtipos:", err);
-        setAssetSubTypes([]);
+        setSubTypes([]);
       });
   }, [dialogOpen, form.assetTypeId]);
 
@@ -379,23 +488,35 @@ export default function Wallet() {
                       key={key}
                       className="whitespace-nowrap bg-muted/50 font-semibold text-foreground"
                     >
-                      {label}
+                      <button
+                        type="button"
+                        onClick={() => handleSort(key)}
+                        className="inline-flex items-center gap-1 text-white"
+                      >
+                        {label}
+                        <span className="text-xs text-white/80">
+                          {sortBy === key ? (sortDirection === "asc" ? "▲" : "▼") : "↕"}
+                        </span>
+                      </button>
                     </TableHead>
                   ))}
+                  <TableHead className="whitespace-nowrap bg-muted/50 font-semibold text-foreground">
+                    Ações
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {assets.length === 0 ? (
+                {sortedAssets.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={COLUMNS.length}
+                      colSpan={COLUMNS.length + 1}
                       className="h-32 text-center text-muted-foreground"
                     >
                       Nenhum ativo na carteira.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  assets.map((row, index) => (
+                  sortedAssets.map((row, index) => (
                     <TableRow
                       key={index}
                       className={cn(
@@ -434,6 +555,28 @@ export default function Wallet() {
                           </TableCell>
                         );
                       })}
+                      <TableCell className="whitespace-nowrap">
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenEditar(row)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteAsset(row)}
+                            className="h-8 w-8 p-0 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -449,7 +592,9 @@ export default function Wallet() {
           onClose={handleCloseCadastro}
         >
           <DialogHeader className="shrink-0">
-            <DialogTitle>Cadastrar Ativo</DialogTitle>
+            <DialogTitle>
+              {editingAssetId ? "Editar Ativo" : "Cadastrar Ativo"}
+            </DialogTitle>
           </DialogHeader>
           <form
             onSubmit={handleSubmitCadastro}
@@ -515,25 +660,6 @@ export default function Wallet() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="assetCategoryId">Categoria</Label>
-                  <select
-                    id="assetCategoryId"
-                    value={form.assetCategoryId ?? ""}
-                    onChange={(e) =>
-                      updateForm(
-                        "assetCategoryId",
-                        e.target.value === "" ? null : Number(e.target.value)
-                      )
-                    }
-                    className={SELECT_CLASS}
-                  >
-                    <option value="">Selecione a categoria</option>
-                    {assetCategories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.category}
-                      </option>
-                    ))}
-                  </select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="bankId">Banco</Label>
@@ -554,15 +680,18 @@ export default function Wallet() {
                   </select>
                 </div>
                 <div className="space-y-2">
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="assetTypeId">Tipo</Label>
                   <select
                     id="assetTypeId"
                     value={form.assetTypeId ?? ""}
-                    onChange={(e) => {
-                      const v = e.target.value === "" ? null : Number(e.target.value);
-                      updateForm("assetTypeId", v);
-                      updateForm("assetSubTypeId", null);
-                    }}
+                    onChange={(e) =>
+                      updateForm(
+                        "assetTypeId",
+                        e.target.value === "" ? null : Number(e.target.value)
+                      )
+                    }
                     className={SELECT_CLASS}
                   >
                     <option value="">Selecione o tipo</option>
@@ -574,13 +703,13 @@ export default function Wallet() {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="assetSubTypeId">SubTipo</Label>
+                  <Label htmlFor="subTypeId">SubTipo</Label>
                   <select
-                    id="assetSubTypeId"
-                    value={form.assetSubTypeId ?? ""}
+                    id="subTypeId"
+                    value={form.subTypeId ?? ""}
                     onChange={(e) =>
                       updateForm(
-                        "assetSubTypeId",
+                        "subTypeId",
                         e.target.value === "" ? null : Number(e.target.value)
                       )
                     }
@@ -592,7 +721,7 @@ export default function Wallet() {
                         ? "Selecione o tipo primeiro"
                         : "Selecione o subtipo"}
                     </option>
-                    {assetSubTypes.map((s) => (
+                    {subTypes.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name}
                       </option>
@@ -611,7 +740,13 @@ export default function Wallet() {
                 Cancelar
               </Button>
               <Button type="submit" variant="success" disabled={submitLoading}>
-                {submitLoading ? "Cadastrando..." : "Cadastrar"}
+                {submitLoading
+                  ? editingAssetId
+                    ? "Editando..."
+                    : "Cadastrando..."
+                  : editingAssetId
+                  ? "Editar"
+                  : "Cadastrar"}
               </Button>
             </DialogFooter>
           </form>
