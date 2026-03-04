@@ -472,7 +472,7 @@ export default function Wallet() {
             type="button"
             variant="success"
             onClick={handleOpenCadastro}
-            className="shrink-0"
+            className="shrink-0 text-white"
           >
             <Plus className="h-4 w-4" />
             Cadastrar Ativo
@@ -491,10 +491,10 @@ export default function Wallet() {
                       <button
                         type="button"
                         onClick={() => handleSort(key)}
-                        className="inline-flex items-center gap-1 text-white"
+                        className="inline-flex items-center gap-1 text-black"
                       >
                         {label}
-                        <span className="text-xs text-white/80">
+                        <span className="text-xs text-black/70">
                           {sortBy === key ? (sortDirection === "asc" ? "▲" : "▼") : "↕"}
                         </span>
                       </button>
@@ -562,16 +562,16 @@ export default function Wallet() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleOpenEditar(row)}
-                            className="h-8 w-8 p-0"
+                            className="h-8 w-8 p-0 text-black"
                           >
                             <Edit2 className="h-4 w-4" />
                           </Button>
                           <Button
                             type="button"
-                            variant="ghost"
+                            variant="destructive"
                             size="sm"
                             onClick={() => handleDeleteAsset(row)}
-                            className="h-8 w-8 p-0 hover:bg-red-50"
+                            className="h-8 w-8 p-0 text-white"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -735,11 +735,12 @@ export default function Wallet() {
                 type="button"
                 variant="outline"
                 onClick={handleCloseCadastro}
+                className="text-black"
                 disabled={submitLoading}
               >
                 Cancelar
               </Button>
-              <Button type="submit" variant="success" disabled={submitLoading}>
+              <Button type="submit" variant="success" className="text-white" disabled={submitLoading}>
                 {submitLoading
                   ? editingAssetId
                     ? "Editando..."
