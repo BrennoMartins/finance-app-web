@@ -31,6 +31,7 @@ interface AssetFromApi {
   quotation: number;
   difference: number;
   index: number;
+  percentWallet?: number;
   value: number;
   bank?: {
     id: number;
@@ -80,14 +81,9 @@ const COLUMNS: { key: keyof WalletAsset; label: string }[] = [
   { key: "quantidade", label: "Quantidade" },
   { key: "precoMedio", label: "Preço Médio" },
   { key: "cotacao", label: "Cotação" },
-  { key: "diferenca", label: "Diferença" },
   { key: "indice", label: "Indice" },
   { key: "valor", label: "Valor" },
-  { key: "aporteMes", label: "Aporte Mês" },
-  { key: "valorMesAnt", label: "Valor Mês Ant." },
-  { key: "percentLucroMes", label: "% Lucro Mês" },
   { key: "lucroRs", label: "Lucro R$" },
-  { key: "vencimento", label: "Vencimento" },
   { key: "percent", label: "%" },
 ];
 
@@ -164,7 +160,7 @@ function mapApiToWalletAsset(item: AssetFromApi): WalletAsset {
     percentLucroMes: 0,
     lucroRs,
     vencimento: "",
-    percent: item.index,
+    percent: item.percentWallet ?? 0,
   };
 }
 
