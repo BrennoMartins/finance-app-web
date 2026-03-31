@@ -6,6 +6,7 @@ import Wallet from "./Wallet";
 import Contributions from "./Contributions";
 import Quotation from "./Quotation";
 import Report from "./Report";
+import Metas from "./Metas";
 
 const NAVBAR_HEIGHT = 64; // px (h-16)
 
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/report" element={<Report />} />
           <Route path="/recommendations" element={<AssetList />} />
           <Route path="/contributions" element={<Contributions />} />
+          <Route path="/metas" element={<Metas />} />
           <Route path="/quotation" element={<Quotation />} />
           <Route path="/about" element={<></>} />
         </Routes>
